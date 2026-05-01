@@ -1,0 +1,12 @@
+node_modules/
+dist/
+build/
+.env
+.env.local
+*.log
+.DS_Store
+backend/data/employees.xlsx
+backend/data/employees.index.json
+backend/tmp/
+frontend/dist/
+.vite/
