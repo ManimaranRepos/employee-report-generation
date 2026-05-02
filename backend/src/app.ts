@@ -31,8 +31,7 @@ export function createApp() {
   app.use('/api', (req, res) => res.status(404).json({ error: 'Not found', path: req.path }));
 
   if (config.env === 'production') {
-    // backend/dist/ → ../../frontend/dist (relative to compiled output location)
-    const frontendDist = path.join(__dirname, '../../frontend/dist');
+    const frontendDist = path.join(process.cwd(), '../frontend/dist');
     app.use(express.static(frontendDist));
     // SPA fallback: any non-API GET returns index.html for client-side routing
     app.get('*', (_req, res) => res.sendFile(path.join(frontendDist, 'index.html')));
