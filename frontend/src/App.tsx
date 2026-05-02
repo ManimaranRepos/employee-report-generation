@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
 import { Database, Activity, ShieldCheck } from 'lucide-react';
@@ -7,6 +7,7 @@ import { EmployeeCard } from './components/EmployeeCard';
 import { ActionBar } from './components/ActionBar';
 import { PdfPreview } from './components/PdfPreview';
 import { EmptyState } from './components/EmptyState';
+import { EmailLog, type EmailLogHandle } from './components/EmailLog';
 import {
   fetchEmployee, generatePdf, emailReport, fetchHealth, type Employee,
 } from './lib/api';
@@ -19,6 +20,7 @@ export default function App() {
   const [sending, setSending] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [health, setHealth] = useState<{ count: number } | null>(null);
+  const emailLogRef = useRef<EmailLogHandle>(null);
 
   useEffect(() => {
     fetchHealth().then((h) => setHealth(h)).catch(() => setHealth(null));
@@ -74,6 +76,7 @@ export default function App() {
       toast.error((err as Error).message);
     } finally {
       setSending(false);
+      emailLogRef.current?.refresh();
     }
   }
 
@@ -154,6 +157,11 @@ export default function App() {
               />
             </>
           )}
+        </section>
+
+        {/* Sent History */}
+        <section className="mt-8">
+          <EmailLog ref={emailLogRef} />
         </section>
 
         <footer className="mt-14 text-center text-xs text-slate-500">

@@ -2,6 +2,9 @@ import nodemailer, { type Transporter } from 'nodemailer';
 import { config } from '../config.js';
 import { logger } from '../logger.js';
 
+export const MAX_ATTEMPTS = 3;
+const RETRY_DELAY_MS = 2000;
+
 let transporter: Transporter | null = null;
 
 function getTransporter(): Transporter {
@@ -58,7 +61,7 @@ export async function sendReportEmail({ to, employeeName, empId, pdf }: SendRepo
       </p>
     </div>`;
 
-  const info = await t.sendMail({
+  const mailOptions = {
     from: config.smtp.from,
     to: resolvedTo,
     subject,
@@ -71,15 +74,32 @@ export async function sendReportEmail({ to, employeeName, empId, pdf }: SendRepo
         contentType: 'application/pdf',
       },
     ],
-  });
-
-  return {
-    previewOnly: config.mailPreviewOnly || !config.smtp.host,
-    messageId: info.messageId,
-    response: (info as { message?: string }).message ?? '',
-    sentTo: resolvedTo,
-    originalTo: to,
   };
+
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      const info = await t.sendMail(mailOptions);
+      if (attempt > 1) {
+        logger.info({ attempt }, 'Email succeeded after retry');
+      }
+      return {
+        previewOnly: config.mailPreviewOnly || !config.smtp.host,
+        messageId: info.messageId,
+        response: (info as { message?: string }).message ?? '',
+        sentTo: resolvedTo,
+        originalTo: to,
+        attempts: attempt,
+      };
+    } catch (err) {
+      lastErr = err;
+      logger.warn({ attempt, err }, `Email attempt ${attempt}/${MAX_ATTEMPTS} failed`);
+      if (attempt < MAX_ATTEMPTS) {
+        await new Promise(res => setTimeout(res, RETRY_DELAY_MS));
+      }
+    }
+  }
+  throw lastErr;
 }
 
 function escape(s: string): string {

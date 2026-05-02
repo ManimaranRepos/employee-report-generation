@@ -2,7 +2,9 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { employeeStore } from '../services/employeeStore.js';
 import { generateEmployeePdf } from '../services/pdfService.js';
-import { sendReportEmail } from '../services/mailService.js';
+import { sendReportEmail, MAX_ATTEMPTS } from '../services/mailService.js';
+import { logEmail, readEmailLog } from '../services/emailLogService.js';
+import { config } from '../config.js';
 import { logger } from '../logger.js';
 
 const router = Router();
@@ -14,6 +16,12 @@ const empIdParam = z.object({
 /** Health / store stats */
 router.get('/health', (_req, res) => {
   res.json({ ok: true, ...employeeStore.meta() });
+});
+
+/** GET /api/employees/email-log — view sent/failed email history */
+router.get('/email-log', (_req, res) => {
+  const entries = readEmailLog();
+  res.json({ count: entries.length, entries });
 });
 
 /** GET /api/employees/search?q=... — autocomplete-style */
@@ -70,8 +78,28 @@ router.post('/:empId/email', async (req, res) => {
       empId: employee.EmpID,
       pdf,
     });
+    logEmail({
+      empId: employee.EmpID,
+      employeeName: employee.FullName,
+      sentTo: result.sentTo,
+      originalTo: result.originalTo,
+      sentAt: new Date().toISOString(),
+      status: 'sent',
+      attempts: result.attempts,
+      messageId: result.messageId,
+    });
     res.json({ ok: true, ...result });
   } catch (err) {
+    logEmail({
+      empId: employee.EmpID,
+      employeeName: employee.FullName,
+      sentTo: config.mailToOverride || employee.Email,
+      originalTo: employee.Email,
+      sentAt: new Date().toISOString(),
+      status: 'failed',
+      attempts: MAX_ATTEMPTS,
+      error: (err as Error).message,
+    });
     logger.error({ err }, 'Email send failed');
     res.status(500).json({ error: 'Email send failed' });
   }

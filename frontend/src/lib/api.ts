@@ -61,3 +61,20 @@ export async function fetchHealth(): Promise<{ ok: boolean; count: number; loade
   const res = await fetch(`${BASE}/health`);
   return asJson(res);
 }
+
+export interface EmailLogEntry {
+  empId: string;
+  employeeName: string;
+  sentTo: string;
+  originalTo: string;
+  sentAt: string;
+  status: 'sent' | 'failed';
+  attempts: number;
+  messageId?: string;
+  error?: string;
+}
+
+export async function fetchEmailLog(): Promise<{ count: number; entries: EmailLogEntry[] }> {
+  const res = await fetch(`${BASE}/email-log`);
+  return asJson(res);
+}

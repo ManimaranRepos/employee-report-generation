@@ -7,6 +7,8 @@ build/
 .DS_Store
 backend/data/employees.xlsx
 backend/data/employees.index.json
+backend/data/email-log.jsonl
 backend/tmp/
+.claude/
 frontend/dist/
 .vite/
