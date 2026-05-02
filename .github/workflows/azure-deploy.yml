@@ -47,14 +47,18 @@ jobs:
 
       - name: Deploy to Azure Container Apps
         env:
-          APP:      ${{ secrets.AZURE_CONTAINER_APP_NAME }}
-          RG:       ${{ secrets.AZURE_RESOURCE_GROUP }}
-          IMAGE:    ${{ secrets.ACR_LOGIN_SERVER }}/employee-reports:${{ github.sha }}
-          ACR_SRV:  ${{ secrets.ACR_LOGIN_SERVER }}
-          ACR_USER: ${{ secrets.ACR_USERNAME }}
-          ACR_PASS: ${{ secrets.ACR_PASSWORD }}
+          APP:     ${{ secrets.AZURE_CONTAINER_APP_NAME }}
+          RG:      ${{ secrets.AZURE_RESOURCE_GROUP }}
+          IMAGE:   ${{ secrets.ACR_LOGIN_SERVER }}/employee-reports:${{ github.sha }}
+          ACR_SRV: ${{ secrets.ACR_LOGIN_SERVER }}
+          ACR_NAME: ${{ secrets.ACR_NAME }}
         run: |
           az extension add --name containerapp --upgrade --only-show-errors
+
+          # Enable admin and fetch credentials from the authenticated Azure session
+          az acr update --name "$ACR_NAME" --admin-enabled true --only-show-errors
+          ACR_USER=$(az acr credential show --name "$ACR_NAME" --query username -o tsv)
+          ACR_PASS=$(az acr credential show --name "$ACR_NAME" --query "passwords[0].value" -o tsv)
 
           ENV_NAME=$(az containerapp env list -g "$RG" --query "[0].name" -o tsv 2>/dev/null)
           if [ -z "$ENV_NAME" ]; then
