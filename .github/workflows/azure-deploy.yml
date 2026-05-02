@@ -47,11 +47,19 @@ jobs:
 
       - name: Deploy to Azure Container Apps
         env:
-          APP:     ${{ secrets.AZURE_CONTAINER_APP_NAME }}
-          RG:      ${{ secrets.AZURE_RESOURCE_GROUP }}
-          IMAGE:   ${{ secrets.ACR_LOGIN_SERVER }}/employee-reports:${{ github.sha }}
-          ACR_SRV: ${{ secrets.ACR_LOGIN_SERVER }}
-          ACR_NAME: ${{ secrets.ACR_NAME }}
+          APP:               ${{ secrets.AZURE_CONTAINER_APP_NAME }}
+          RG:                ${{ secrets.AZURE_RESOURCE_GROUP }}
+          IMAGE:             ${{ secrets.ACR_LOGIN_SERVER }}/employee-reports:${{ github.sha }}
+          ACR_SRV:           ${{ secrets.ACR_LOGIN_SERVER }}
+          ACR_NAME:          ${{ secrets.ACR_NAME }}
+          SMTP_HOST:         ${{ secrets.SMTP_HOST }}
+          SMTP_PORT:         ${{ secrets.SMTP_PORT }}
+          SMTP_SECURE:       ${{ secrets.SMTP_SECURE }}
+          SMTP_USER:         ${{ secrets.SMTP_USER }}
+          SMTP_PASS:         ${{ secrets.SMTP_PASS }}
+          MAIL_FROM:         ${{ secrets.MAIL_FROM }}
+          MAIL_PREVIEW_ONLY: ${{ secrets.MAIL_PREVIEW_ONLY }}
+          MAIL_TO_OVERRIDE:  ${{ secrets.MAIL_TO_OVERRIDE }}
         run: |
           az extension add --name containerapp --upgrade --only-show-errors
 
@@ -69,11 +77,16 @@ jobs:
 
           EXISTS=$(az containerapp show -n "$APP" -g "$RG" --query name -o tsv 2>/dev/null || true)
 
+          SMTP_ENV_VARS="SMTP_HOST=$SMTP_HOST SMTP_PORT=$SMTP_PORT SMTP_SECURE=$SMTP_SECURE \
+            SMTP_USER=$SMTP_USER SMTP_PASS=$SMTP_PASS MAIL_FROM=$MAIL_FROM \
+            MAIL_PREVIEW_ONLY=$MAIL_PREVIEW_ONLY MAIL_TO_OVERRIDE=$MAIL_TO_OVERRIDE"
+
           if [ -n "$EXISTS" ]; then
             echo "Updating existing Container App..."
             az containerapp registry set -n "$APP" -g "$RG" \
               --server "$ACR_SRV" --username "$ACR_USER" --password "$ACR_PASS"
-            az containerapp update -n "$APP" -g "$RG" --image "$IMAGE"
+            az containerapp update -n "$APP" -g "$RG" --image "$IMAGE" \
+              --set-env-vars $SMTP_ENV_VARS
           else
             echo "Creating new Container App..."
             az containerapp create -n "$APP" -g "$RG" \
@@ -84,5 +97,6 @@ jobs:
               --registry-password "$ACR_PASS" \
               --ingress external \
               --target-port 8080 \
-              --cpu 0.5 --memory 1.0Gi
+              --cpu 0.5 --memory 1.0Gi \
+              --env-vars $SMTP_ENV_VARS
           fi
