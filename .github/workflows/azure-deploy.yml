@@ -56,7 +56,12 @@ jobs:
         run: |
           az extension add --name containerapp --upgrade --only-show-errors
 
-          ENV_NAME=$(az containerapp env list -g "$RG" --query "[0].name" -o tsv)
+          ENV_NAME=$(az containerapp env list -g "$RG" --query "[0].name" -o tsv 2>/dev/null)
+          if [ -z "$ENV_NAME" ]; then
+            echo "No Container Apps Environment found, creating one..."
+            ENV_NAME="${APP}-env"
+            az containerapp env create -n "$ENV_NAME" -g "$RG" --location eastus
+          fi
 
           EXISTS=$(az containerapp show -n "$APP" -g "$RG" --query name -o tsv 2>/dev/null || true)
 
