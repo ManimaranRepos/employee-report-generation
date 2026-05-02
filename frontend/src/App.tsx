@@ -154,6 +154,7 @@ export default function App() {
               <PdfPreview
                 url={pdfUrl}
                 fileName={`EmployeeReport-${employee.EmpID}.pdf`}
+                onClose={() => { URL.revokeObjectURL(pdfUrl!); setPdfUrl(null); }}
               />
             </>
           )}

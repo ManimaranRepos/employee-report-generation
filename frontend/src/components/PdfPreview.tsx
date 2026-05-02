@@ -1,12 +1,13 @@
 import { motion } from 'framer-motion';
-import { FileText, ExternalLink, Download } from 'lucide-react';
+import { FileText, ExternalLink, Download, X } from 'lucide-react';
 
 interface Props {
   url: string | null;
   fileName: string;
+  onClose: () => void;
 }
 
-export function PdfPreview({ url, fileName }: Props) {
+export function PdfPreview({ url, fileName, onClose }: Props) {
   if (!url) return null;
   return (
     <motion.div
@@ -36,6 +37,13 @@ export function PdfPreview({ url, fileName }: Props) {
           >
             <Download className="w-3.5 h-3.5" /> Download
           </a>
+          <button
+            onClick={onClose}
+            className="inline-flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg bg-rose-500/15 hover:bg-rose-500/30 text-rose-300 transition-colors"
+            title="Close preview"
+          >
+            <X className="w-3.5 h-3.5" /> Close
+          </button>
         </div>
       </div>
       <div className="bg-slate-950">
