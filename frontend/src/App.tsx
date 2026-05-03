@@ -2,12 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Database, Activity, ShieldCheck, Search, Loader2, Mail, X, ExternalLink, Download,
+  Database, Activity, ShieldCheck, Search, Loader2, Mail, X, ExternalLink, Download, Send, CheckSquare,
 } from 'lucide-react';
 import { EmployeeTable } from './components/EmployeeTable';
 import { EmailLog, type EmailLogHandle } from './components/EmailLog';
 import {
-  fetchEmployeesPage, generatePdf, emailReport, fetchHealth, type Employee,
+  fetchEmployeesPage, generatePdf, emailReport, bulkEmailReports, fetchHealth, type Employee,
 } from './lib/api';
 
 export default function App() {
@@ -19,6 +19,8 @@ export default function App() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [tableLoading, setTableLoading] = useState(true);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+  const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
+  const [bulkSending, setBulkSending] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [sending, setSending] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
@@ -78,6 +80,51 @@ export default function App() {
   function handleClosePanel() {
     setSelectedEmployee(null);
     setPdfUrl(null);
+  }
+
+  function handleToggleCheck(emp: Employee) {
+    setCheckedIds((prev) => {
+      const next = new Set(prev);
+      next.has(emp.EmpID) ? next.delete(emp.EmpID) : next.add(emp.EmpID);
+      return next;
+    });
+  }
+
+  function handleToggleCheckAll(emps: Employee[]) {
+    const pageIds = emps.map((e) => e.EmpID);
+    const allChecked = pageIds.every((id) => checkedIds.has(id));
+    setCheckedIds((prev) => {
+      const next = new Set(prev);
+      if (allChecked) pageIds.forEach((id) => next.delete(id));
+      else pageIds.forEach((id) => next.add(id));
+      return next;
+    });
+  }
+
+  function handleClearSelection() {
+    setCheckedIds(new Set());
+  }
+
+  async function handleBulkSend() {
+    if (checkedIds.size === 0 || bulkSending) return;
+    setBulkSending(true);
+    const ids = Array.from(checkedIds);
+    const loadingId = toast.loading(`Sending ${ids.length} report${ids.length > 1 ? 's' : ''}…`);
+    try {
+      const { results } = await bulkEmailReports(ids);
+      toast.dismiss(loadingId);
+      const sent = results.filter((r) => r.ok);
+      const failed = results.filter((r) => !r.ok);
+      if (sent.length > 0) toast.success(`${sent.length} report${sent.length > 1 ? 's' : ''} sent successfully`);
+      failed.forEach((r) => toast.error(`Failed for ${r.empId}: ${r.error ?? 'unknown error'}`));
+      setCheckedIds(new Set());
+      emailLogRef.current?.refresh();
+    } catch (err) {
+      toast.dismiss(loadingId);
+      toast.error((err as Error).message);
+    } finally {
+      setBulkSending(false);
+    }
   }
 
   async function handleSendEmail() {
@@ -144,6 +191,42 @@ export default function App() {
           </div>
         </motion.div>
 
+        {/* Bulk action bar */}
+        <AnimatePresence>
+          {checkedIds.size > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2 }}
+              className="mb-3 flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-indigo-500/10 border border-indigo-500/30"
+            >
+              <div className="flex items-center gap-2 text-sm text-indigo-200">
+                <CheckSquare className="w-4 h-4 text-indigo-400" />
+                <span>
+                  <span className="font-bold">{checkedIds.size}</span> employee{checkedIds.size > 1 ? 's' : ''} selected
+                </span>
+                <button
+                  onClick={handleClearSelection}
+                  className="ml-1 text-xs text-slate-400 hover:text-slate-200 transition-colors underline underline-offset-2"
+                >
+                  Clear
+                </button>
+              </div>
+              <button
+                onClick={handleBulkSend}
+                disabled={bulkSending}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-tr from-indigo-500 to-fuchsia-500 text-white text-sm font-semibold shadow-glow hover:shadow-glow-lg transition disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {bulkSending
+                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  : <Send className="w-3.5 h-3.5" />}
+                Send {checkedIds.size} Report{checkedIds.size > 1 ? 's' : ''}
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Table + detail panel */}
         <div className={`grid gap-5 ${selectedEmployee ? 'lg:grid-cols-[1fr_420px]' : 'grid-cols-1'}`}>
           <EmployeeTable
@@ -151,6 +234,9 @@ export default function App() {
             loading={tableLoading}
             selectedId={selectedEmployee?.EmpID ?? null}
             onSelect={handleRowSelect}
+            checkedIds={checkedIds}
+            onToggleCheck={handleToggleCheck}
+            onToggleCheckAll={handleToggleCheckAll}
             page={currentPage}
             pages={totalPages}
             total={totalRecords}

@@ -72,6 +72,60 @@ router.post('/:empId/pdf', async (req, res) => {
   }
 });
 
+/** POST /api/employees/bulk-email — generate and send PDFs to multiple employees */
+router.post('/bulk-email', async (req, res) => {
+  const schema = z.object({ empIds: z.array(z.string().min(1).max(32)).min(1).max(50) });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'Invalid request body' });
+
+  const results = await Promise.allSettled(
+    parsed.data.empIds.map(async (empId) => {
+      const employee = employeeStore.findById(empId);
+      if (!employee) throw new Error(`Employee ${empId} not found`);
+      if (!employee.Email) throw new Error(`Employee ${empId} has no email`);
+
+      const pdf = await generateEmployeePdf(employee);
+      const result = await sendReportEmail({
+        to: employee.Email,
+        employeeName: employee.FullName,
+        empId: employee.EmpID,
+        pdf,
+      });
+      logEmail({
+        empId: employee.EmpID,
+        employeeName: employee.FullName,
+        sentTo: result.sentTo,
+        originalTo: result.originalTo,
+        sentAt: new Date().toISOString(),
+        status: 'sent',
+        attempts: result.attempts,
+        messageId: result.messageId,
+      });
+      return { empId, ...result };
+    }),
+  );
+
+  const summary = results.map((r, i) => {
+    const empId = parsed.data.empIds[i];
+    if (r.status === 'fulfilled') return { empId, ok: true, sentTo: r.value.sentTo };
+    const employee = employeeStore.findById(empId);
+    logEmail({
+      empId,
+      employeeName: employee?.FullName ?? empId,
+      sentTo: config.mailToOverride || employee?.Email || '',
+      originalTo: employee?.Email || '',
+      sentAt: new Date().toISOString(),
+      status: 'failed',
+      attempts: MAX_ATTEMPTS,
+      error: r.reason?.message,
+    });
+    return { empId, ok: false, error: r.reason?.message };
+  });
+
+  const failed = summary.filter((s) => !s.ok).length;
+  res.status(failed === summary.length ? 500 : 200).json({ results: summary });
+});
+
 /** POST /api/employees/:empId/email — generate PDF and email it */
 router.post('/:empId/email', async (req, res) => {
   const parsed = empIdParam.safeParse(req.params);

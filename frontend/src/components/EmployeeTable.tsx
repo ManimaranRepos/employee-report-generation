@@ -7,6 +7,9 @@ interface Props {
   loading: boolean;
   selectedId: string | null;
   onSelect: (emp: Employee) => void;
+  checkedIds: Set<string>;
+  onToggleCheck: (emp: Employee) => void;
+  onToggleCheckAll: (emps: Employee[]) => void;
   page: number;
   pages: number;
   total: number;
@@ -70,14 +73,30 @@ function PaginationBar({
 }
 
 export function EmployeeTable({
-  employees, loading, selectedId, onSelect, page, pages, total, onPageChange,
+  employees, loading, selectedId, onSelect,
+  checkedIds, onToggleCheck, onToggleCheckAll,
+  page, pages, total, onPageChange,
 }: Props) {
+  const pageIds = employees.map((e) => e.EmpID);
+  const allChecked = pageIds.length > 0 && pageIds.every((id) => checkedIds.has(id));
+  const someChecked = pageIds.some((id) => checkedIds.has(id)) && !allChecked;
+
   return (
     <div className="glass rounded-2xl overflow-hidden shadow-glow">
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-white/5">
+              <th className="px-4 py-3 w-10">
+                <input
+                  type="checkbox"
+                  checked={allChecked}
+                  ref={(el) => { if (el) el.indeterminate = someChecked; }}
+                  onChange={() => onToggleCheckAll(employees)}
+                  className="w-3.5 h-3.5 rounded border-slate-600 bg-slate-800 accent-indigo-500 cursor-pointer"
+                  title="Select all on this page"
+                />
+              </th>
               <th className="px-4 py-3 text-left text-[11px] uppercase tracking-wide text-slate-500 font-medium">Name</th>
               <th className="px-4 py-3 text-left text-[11px] uppercase tracking-wide text-slate-500 font-medium">Emp ID</th>
               <th className="px-4 py-3 text-left text-[11px] uppercase tracking-wide text-slate-500 font-medium hidden md:table-cell">Department</th>
@@ -90,6 +109,7 @@ export function EmployeeTable({
             {loading ? (
               Array.from({ length: 10 }).map((_, i) => (
                 <tr key={i} className="border-b border-white/5 last:border-0">
+                  <td className="px-4 py-3.5"><div className="h-3 w-3.5 rounded shimmer" /></td>
                   <td className="px-4 py-3.5"><div className="h-3 w-32 rounded shimmer" /></td>
                   <td className="px-4 py-3.5"><div className="h-3 w-20 rounded shimmer" /></td>
                   <td className="px-4 py-3.5 hidden md:table-cell"><div className="h-3 w-24 rounded shimmer" /></td>
@@ -100,7 +120,7 @@ export function EmployeeTable({
               ))
             ) : employees.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-14 text-center">
+                <td colSpan={7} className="px-4 py-14 text-center">
                   <Users className="w-8 h-8 mx-auto mb-2.5 text-slate-600" />
                   <p className="text-slate-500 text-sm">No employees found</p>
                 </td>
@@ -108,24 +128,61 @@ export function EmployeeTable({
             ) : (
               employees.map((emp) => {
                 const selected = selectedId === emp.EmpID;
+                const checked = checkedIds.has(emp.EmpID);
                 return (
                   <motion.tr
                     key={emp.EmpID}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ duration: 0.15 }}
-                    onClick={() => onSelect(emp)}
-                    className={`border-b border-white/5 last:border-0 cursor-pointer transition-colors ${
-                      selected ? 'bg-indigo-500/15' : 'hover:bg-slate-800/40'
+                    className={`border-b border-white/5 last:border-0 transition-colors ${
+                      checked
+                        ? 'bg-fuchsia-500/10'
+                        : selected
+                        ? 'bg-indigo-500/15'
+                        : 'hover:bg-slate-800/40'
                     }`}
                   >
-                    <td className={`px-4 py-3 font-medium text-slate-100 ${selected ? 'shadow-[inset_3px_0_0_rgb(99,102,241)]' : ''}`}>
+                    <td
+                      className="px-4 py-3 w-10"
+                      onClick={(e) => { e.stopPropagation(); onToggleCheck(emp); }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => onToggleCheck(emp)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-3.5 h-3.5 rounded border-slate-600 bg-slate-800 accent-indigo-500 cursor-pointer"
+                      />
+                    </td>
+                    <td
+                      onClick={() => onSelect(emp)}
+                      className={`px-4 py-3 font-medium text-slate-100 cursor-pointer ${selected ? 'shadow-[inset_3px_0_0_rgb(99,102,241)]' : ''}`}
+                    >
                       {emp.FullName}
                     </td>
-                    <td className="px-4 py-3 font-mono text-xs text-indigo-300">{emp.EmpID}</td>
-                    <td className="px-4 py-3 text-slate-300 hidden md:table-cell">{emp.Department}</td>
-                    <td className="px-4 py-3 text-slate-400 hidden lg:table-cell">{emp.Designation}</td>
-                    <td className="px-4 py-3">
+                    <td
+                      onClick={() => onSelect(emp)}
+                      className="px-4 py-3 font-mono text-xs text-indigo-300 cursor-pointer"
+                    >
+                      {emp.EmpID}
+                    </td>
+                    <td
+                      onClick={() => onSelect(emp)}
+                      className="px-4 py-3 text-slate-300 hidden md:table-cell cursor-pointer"
+                    >
+                      {emp.Department}
+                    </td>
+                    <td
+                      onClick={() => onSelect(emp)}
+                      className="px-4 py-3 text-slate-400 hidden lg:table-cell cursor-pointer"
+                    >
+                      {emp.Designation}
+                    </td>
+                    <td
+                      onClick={() => onSelect(emp)}
+                      className="px-4 py-3 cursor-pointer"
+                    >
                       <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold ${
                         emp.Status === 'Active'
                           ? 'bg-emerald-500/20 text-emerald-300'
@@ -134,7 +191,10 @@ export function EmployeeTable({
                         {emp.Status}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right text-slate-300 font-medium hidden sm:table-cell">
+                    <td
+                      onClick={() => onSelect(emp)}
+                      className="px-4 py-3 text-right text-slate-300 font-medium hidden sm:table-cell cursor-pointer"
+                    >
                       {emp.AnnualSalary.toLocaleString('en-US', {
                         style: 'currency', currency: 'USD', maximumFractionDigits: 0,
                       })}

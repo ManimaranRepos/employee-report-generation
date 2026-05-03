@@ -74,6 +74,22 @@ export interface EmailLogEntry {
   error?: string;
 }
 
+export interface BulkEmailResult {
+  empId: string;
+  ok: boolean;
+  sentTo?: string;
+  error?: string;
+}
+
+export async function bulkEmailReports(empIds: string[]): Promise<{ results: BulkEmailResult[] }> {
+  const res = await fetch(`${BASE}/bulk-email`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ empIds }),
+  });
+  return asJson(res);
+}
+
 export async function fetchEmailLog(): Promise<{ count: number; entries: EmailLogEntry[] }> {
   const res = await fetch(`${BASE}/email-log`);
   return asJson(res);
