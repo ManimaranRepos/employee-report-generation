@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Database, Activity, ShieldCheck, Search, Loader2, Mail, X, ExternalLink, Download, Send, CheckSquare,
+  Database, Activity, ShieldCheck, Search, Loader2, Mail, X, ExternalLink, Download, ClipboardList,
 } from 'lucide-react';
 import { EmployeeTable } from './components/EmployeeTable';
+import { SelectionReviewPanel } from './components/SelectionReviewPanel';
 import { EmailLog, type EmailLogHandle } from './components/EmailLog';
 import {
   fetchEmployeesPage, generatePdf, emailReport, bulkEmailReports, fetchHealth, type Employee,
@@ -18,12 +19,18 @@ export default function App() {
   const [totalRecords, setTotalRecords] = useState(0);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [tableLoading, setTableLoading] = useState(true);
+
+  // Single-employee PDF preview
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
-  const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
-  const [bulkSending, setBulkSending] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [sending, setSending] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+
+  // Multi-select — store full Employee objects so review panel needs no extra fetches
+  const [checkedEmployees, setCheckedEmployees] = useState<Map<string, Employee>>(new Map());
+  const [reviewMode, setReviewMode] = useState(false);
+  const [bulkSending, setBulkSending] = useState(false);
+
   const [health, setHealth] = useState<{ count: number } | null>(null);
   const emailLogRef = useRef<EmailLogHandle>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -32,7 +39,6 @@ export default function App() {
     fetchHealth().then((h) => setHealth(h)).catch(() => setHealth(null));
   }, []);
 
-  // Debounce filter → reset to page 1
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
@@ -42,7 +48,6 @@ export default function App() {
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [filterQuery]);
 
-  // Load page whenever page or filter changes
   useEffect(() => {
     setTableLoading(true);
     fetchEmployeesPage(currentPage, 10, debouncedQuery)
@@ -55,14 +60,14 @@ export default function App() {
       .finally(() => setTableLoading(false));
   }, [currentPage, debouncedQuery]);
 
-  // Revoke previous blob URL when pdfUrl changes or component unmounts
   useEffect(() => {
     const url = pdfUrl;
     return () => { if (url) URL.revokeObjectURL(url); };
   }, [pdfUrl]);
 
+  // --- PDF preview (single row click) ---
   async function handleRowSelect(emp: Employee) {
-    // Allow re-click to retry if PDF failed; skip if already selected with PDF ready
+    if (reviewMode) return; // don't override review panel
     if (selectedEmployee?.EmpID === emp.EmpID && pdfUrl) return;
     setSelectedEmployee(emp);
     setPdfUrl(null);
@@ -77,38 +82,69 @@ export default function App() {
     }
   }
 
-  function handleClosePanel() {
+  function handleClosePreview() {
     setSelectedEmployee(null);
     setPdfUrl(null);
   }
 
+  async function handleSendEmail() {
+    if (!selectedEmployee) return;
+    setSending(true);
+    try {
+      const res = await emailReport(selectedEmployee.EmpID);
+      toast.success(res.previewOnly ? `Preview-only: would have emailed ${res.sentTo}` : `Sent to ${res.sentTo}`);
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setSending(false);
+      emailLogRef.current?.refresh();
+    }
+  }
+
+  // --- Multi-select ---
+  const checkedIds = new Set(checkedEmployees.keys());
+
   function handleToggleCheck(emp: Employee) {
-    setCheckedIds((prev) => {
-      const next = new Set(prev);
-      next.has(emp.EmpID) ? next.delete(emp.EmpID) : next.add(emp.EmpID);
+    setCheckedEmployees((prev) => {
+      const next = new Map(prev);
+      next.has(emp.EmpID) ? next.delete(emp.EmpID) : next.set(emp.EmpID, emp);
       return next;
     });
   }
 
   function handleToggleCheckAll(emps: Employee[]) {
-    const pageIds = emps.map((e) => e.EmpID);
-    const allChecked = pageIds.every((id) => checkedIds.has(id));
-    setCheckedIds((prev) => {
-      const next = new Set(prev);
-      if (allChecked) pageIds.forEach((id) => next.delete(id));
-      else pageIds.forEach((id) => next.add(id));
+    const allChecked = emps.every((e) => checkedEmployees.has(e.EmpID));
+    setCheckedEmployees((prev) => {
+      const next = new Map(prev);
+      if (allChecked) emps.forEach((e) => next.delete(e.EmpID));
+      else emps.forEach((e) => next.set(e.EmpID, e));
       return next;
     });
   }
 
-  function handleClearSelection() {
-    setCheckedIds(new Set());
+  function handleRemoveFromSelection(empId: string) {
+    setCheckedEmployees((prev) => {
+      const next = new Map(prev);
+      next.delete(empId);
+      if (next.size === 0) setReviewMode(false);
+      return next;
+    });
+  }
+
+  function handleOpenReview() {
+    setSelectedEmployee(null);
+    setPdfUrl(null);
+    setReviewMode(true);
+  }
+
+  function handleCloseReview() {
+    setReviewMode(false);
   }
 
   async function handleBulkSend() {
-    if (checkedIds.size === 0 || bulkSending) return;
+    if (checkedEmployees.size === 0 || bulkSending) return;
     setBulkSending(true);
-    const ids = Array.from(checkedIds);
+    const ids = Array.from(checkedEmployees.keys());
     const loadingId = toast.loading(`Sending ${ids.length} report${ids.length > 1 ? 's' : ''}…`);
     try {
       const { results } = await bulkEmailReports(ids);
@@ -117,7 +153,8 @@ export default function App() {
       const failed = results.filter((r) => !r.ok);
       if (sent.length > 0) toast.success(`${sent.length} report${sent.length > 1 ? 's' : ''} sent successfully`);
       failed.forEach((r) => toast.error(`Failed for ${r.empId}: ${r.error ?? 'unknown error'}`));
-      setCheckedIds(new Set());
+      setCheckedEmployees(new Map());
+      setReviewMode(false);
       emailLogRef.current?.refresh();
     } catch (err) {
       toast.dismiss(loadingId);
@@ -127,23 +164,7 @@ export default function App() {
     }
   }
 
-  async function handleSendEmail() {
-    if (!selectedEmployee) return;
-    setSending(true);
-    try {
-      const res = await emailReport(selectedEmployee.EmpID);
-      if (res.previewOnly) {
-        toast.success(`Preview-only: would have emailed ${res.sentTo}`);
-      } else {
-        toast.success(`Sent to ${res.sentTo}`);
-      }
-    } catch (err) {
-      toast.error((err as Error).message);
-    } finally {
-      setSending(false);
-      emailLogRef.current?.refresh();
-    }
-  }
+  const rightPanelOpen = reviewMode || !!selectedEmployee;
 
   return (
     <div className="min-h-screen bg-mesh relative">
@@ -162,7 +183,7 @@ export default function App() {
             </div>
             <div>
               <h1 className="text-lg sm:text-xl font-bold text-slate-50">Employee Reports</h1>
-              <p className="text-xs text-slate-400 -mt-0.5">Browse · Select · Preview · Email</p>
+              <p className="text-xs text-slate-400 -mt-0.5">Browse · Preview · Select · Email</p>
             </div>
           </div>
           <div className="hidden sm:flex items-center gap-2">
@@ -172,14 +193,14 @@ export default function App() {
           </div>
         </motion.header>
 
-        {/* Filter input */}
+        {/* Filter + action bar row */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.05 }}
-          className="mb-5"
+          className="mb-5 flex items-center gap-3 flex-wrap"
         >
-          <div className="relative max-w-sm">
+          <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
             <input
               type="text"
@@ -189,50 +210,44 @@ export default function App() {
               className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-slate-900/70 border border-slate-700/60 text-slate-200 placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/60 transition"
             />
           </div>
-        </motion.div>
 
-        {/* Bulk action bar */}
-        <AnimatePresence>
-          {checkedIds.size > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: -8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.2 }}
-              className="mb-3 flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-indigo-500/10 border border-indigo-500/30"
-            >
-              <div className="flex items-center gap-2 text-sm text-indigo-200">
-                <CheckSquare className="w-4 h-4 text-indigo-400" />
-                <span>
-                  <span className="font-bold">{checkedIds.size}</span> employee{checkedIds.size > 1 ? 's' : ''} selected
+          {/* Review & Send button — appears when employees are checked */}
+          <AnimatePresence>
+            {checkedIds.size > 0 && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ duration: 0.15 }}
+                className="flex items-center gap-2"
+              >
+                <span className="text-xs text-slate-400">
+                  <span className="font-semibold text-indigo-300">{checkedIds.size}</span> selected
                 </span>
                 <button
-                  onClick={handleClearSelection}
-                  className="ml-1 text-xs text-slate-400 hover:text-slate-200 transition-colors underline underline-offset-2"
+                  onClick={() => setCheckedEmployees(new Map())}
+                  className="text-xs text-slate-500 hover:text-slate-300 transition-colors underline underline-offset-2"
                 >
                   Clear
                 </button>
-              </div>
-              <button
-                onClick={handleBulkSend}
-                disabled={bulkSending}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-tr from-indigo-500 to-fuchsia-500 text-white text-sm font-semibold shadow-glow hover:shadow-glow-lg transition disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {bulkSending
-                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  : <Send className="w-3.5 h-3.5" />}
-                Send {checkedIds.size} Report{checkedIds.size > 1 ? 's' : ''}
-              </button>
-            </motion.div>
-          )}
-        </AnimatePresence>
+                <button
+                  onClick={handleOpenReview}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-tr from-indigo-500 to-fuchsia-500 text-white text-sm font-semibold shadow-glow hover:shadow-glow-lg transition"
+                >
+                  <ClipboardList className="w-3.5 h-3.5" />
+                  Review & Send ({checkedIds.size})
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
 
-        {/* Table + detail panel */}
-        <div className={`grid gap-5 ${selectedEmployee ? 'lg:grid-cols-[1fr_420px]' : 'grid-cols-1'}`}>
+        {/* Table + right panel */}
+        <div className={`grid gap-5 ${rightPanelOpen ? 'lg:grid-cols-[1fr_420px]' : 'grid-cols-1'}`}>
           <EmployeeTable
             employees={employees}
             loading={tableLoading}
-            selectedId={selectedEmployee?.EmpID ?? null}
+            selectedId={!reviewMode ? (selectedEmployee?.EmpID ?? null) : null}
             onSelect={handleRowSelect}
             checkedIds={checkedIds}
             onToggleCheck={handleToggleCheck}
@@ -243,8 +258,17 @@ export default function App() {
             onPageChange={setCurrentPage}
           />
 
-          <AnimatePresence>
-            {selectedEmployee && (
+          <AnimatePresence mode="wait">
+            {reviewMode ? (
+              <SelectionReviewPanel
+                key="review"
+                employees={Array.from(checkedEmployees.values())}
+                sending={bulkSending}
+                onRemove={handleRemoveFromSelection}
+                onSendAll={handleBulkSend}
+                onClose={handleCloseReview}
+              />
+            ) : selectedEmployee ? (
               <DetailPanel
                 key={selectedEmployee.EmpID}
                 employee={selectedEmployee}
@@ -252,10 +276,10 @@ export default function App() {
                 generating={generating}
                 sending={sending}
                 onSendEmail={handleSendEmail}
-                onClose={handleClosePanel}
+                onClose={handleClosePreview}
                 fileName={`EmployeeReport-${selectedEmployee.EmpID}.pdf`}
               />
-            )}
+            ) : null}
           </AnimatePresence>
         </div>
 
@@ -282,11 +306,8 @@ interface DetailPanelProps {
   fileName: string;
 }
 
-function DetailPanel({
-  employee, pdfUrl, generating, sending, onSendEmail, onClose, fileName,
-}: DetailPanelProps) {
-  const initials =
-    ((employee.FirstName?.[0] ?? '') + (employee.LastName?.[0] ?? '')).toUpperCase() || 'EM';
+function DetailPanel({ employee, pdfUrl, generating, sending, onSendEmail, onClose, fileName }: DetailPanelProps) {
+  const initials = ((employee.FirstName?.[0] ?? '') + (employee.LastName?.[0] ?? '')).toUpperCase() || 'EM';
 
   return (
     <motion.div
@@ -296,7 +317,6 @@ function DetailPanel({
       transition={{ duration: 0.25 }}
       className="glass rounded-2xl shadow-glow overflow-hidden flex flex-col"
     >
-      {/* Mini employee header */}
       <div className="flex items-center justify-between px-4 py-3.5 border-b border-white/5">
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-fuchsia-500 grid place-items-center text-white text-sm font-bold shrink-0">
@@ -318,7 +338,6 @@ function DetailPanel({
         </button>
       </div>
 
-      {/* PDF area */}
       <div className="flex-1 bg-slate-950 min-h-0">
         {generating ? (
           <div className="h-[460px] flex items-center justify-center">
@@ -349,11 +368,7 @@ function DetailPanel({
                 </a>
               </div>
             </div>
-            <iframe
-              title="PDF preview"
-              src={pdfUrl}
-              className="w-full h-[460px] bg-slate-950"
-            />
+            <iframe title="PDF preview" src={pdfUrl} className="w-full h-[460px] bg-slate-950" />
           </>
         ) : (
           <div className="h-[460px] flex items-center justify-center text-slate-600 text-sm">
@@ -362,7 +377,6 @@ function DetailPanel({
         )}
       </div>
 
-      {/* Send email */}
       <div className="px-4 py-3.5 border-t border-white/5">
         <button
           onClick={onSendEmail}
@@ -371,18 +385,14 @@ function DetailPanel({
           className="w-full inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-tr from-indigo-500 to-fuchsia-500 text-white font-semibold shadow-glow hover:shadow-glow-lg transition disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
-          {employee.Email
-            ? `Send to ${employee.Email.split('@')[0]}@…`
-            : 'Send Email'}
+          {employee.Email ? `Send to ${employee.Email.split('@')[0]}@…` : 'Send Email'}
         </button>
       </div>
     </motion.div>
   );
 }
 
-function Pill({
-  icon: Icon, text,
-}: { icon: React.ComponentType<{ className?: string }>; text: string }) {
+function Pill({ icon: Icon, text }: { icon: React.ComponentType<{ className?: string }>; text: string }) {
   return (
     <span className="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full bg-slate-900/60 border border-white/5 text-slate-300">
       <Icon className="w-3.5 h-3.5 text-indigo-300" />
