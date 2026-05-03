@@ -12,3 +12,4 @@ backend/tmp/
 .claude/
 frontend/dist/
 .vite/
+frontend/tsconfig.tsbuildinfo
