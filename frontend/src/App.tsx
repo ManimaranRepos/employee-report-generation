@@ -1,60 +1,73 @@
 import { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
-import { motion } from 'framer-motion';
-import { Database, Activity, ShieldCheck } from 'lucide-react';
-import { SearchBar } from './components/SearchBar';
-import { EmployeeCard } from './components/EmployeeCard';
-import { ActionBar } from './components/ActionBar';
-import { PdfPreview } from './components/PdfPreview';
-import { EmptyState } from './components/EmptyState';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Database, Activity, ShieldCheck, Search, Loader2, Mail, X, ExternalLink, Download,
+} from 'lucide-react';
+import { EmployeeTable } from './components/EmployeeTable';
 import { EmailLog, type EmailLogHandle } from './components/EmailLog';
 import {
-  fetchEmployee, generatePdf, emailReport, fetchHealth, type Employee,
+  fetchEmployeesPage, generatePdf, emailReport, fetchHealth, type Employee,
 } from './lib/api';
 
 export default function App() {
-  const [query, setQuery] = useState('');
-  const [employee, setEmployee] = useState<Employee | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [filterQuery, setFilterQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [tableLoading, setTableLoading] = useState(true);
+  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [generating, setGenerating] = useState(false);
   const [sending, setSending] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [health, setHealth] = useState<{ count: number } | null>(null);
   const emailLogRef = useRef<EmailLogHandle>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     fetchHealth().then((h) => setHealth(h)).catch(() => setHealth(null));
   }, []);
 
-  // Revoke previous object URL when a new PDF arrives or component unmounts
-  useEffect(() => () => { if (pdfUrl) URL.revokeObjectURL(pdfUrl); }, [pdfUrl]);
+  // Debounce filter → reset to page 1
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setDebouncedQuery(filterQuery);
+      setCurrentPage(1);
+    }, 300);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [filterQuery]);
 
-  async function handleSearch(rawId: string) {
-    const empId = rawId.trim();
-    if (!empId) return;
-    setLoading(true);
-    setEmployee(null);
-    if (pdfUrl) { URL.revokeObjectURL(pdfUrl); setPdfUrl(null); }
-    try {
-      const t0 = performance.now();
-      const emp = await fetchEmployee(empId);
-      setEmployee(emp);
-      toast.success(`Found ${emp.FullName} in ${(performance.now() - t0).toFixed(0)}ms`);
-    } catch (err) {
-      toast.error((err as Error).message);
-    } finally {
-      setLoading(false);
-    }
-  }
+  // Load page whenever page or filter changes
+  useEffect(() => {
+    setTableLoading(true);
+    fetchEmployeesPage(currentPage, 10, debouncedQuery)
+      .then(({ data, total, pages }) => {
+        setEmployees(data);
+        setTotalRecords(total);
+        setTotalPages(pages);
+      })
+      .catch((err) => toast.error((err as Error).message))
+      .finally(() => setTableLoading(false));
+  }, [currentPage, debouncedQuery]);
 
-  async function handleGenerate() {
-    if (!employee) return;
+  // Revoke previous blob URL when pdfUrl changes or component unmounts
+  useEffect(() => {
+    const url = pdfUrl;
+    return () => { if (url) URL.revokeObjectURL(url); };
+  }, [pdfUrl]);
+
+  async function handleRowSelect(emp: Employee) {
+    // Allow re-click to retry if PDF failed; skip if already selected with PDF ready
+    if (selectedEmployee?.EmpID === emp.EmpID && pdfUrl) return;
+    setSelectedEmployee(emp);
+    setPdfUrl(null);
     setGenerating(true);
     try {
-      const blob = await generatePdf(employee.EmpID);
-      if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+      const blob = await generatePdf(emp.EmpID);
       setPdfUrl(URL.createObjectURL(blob));
-      toast.success('PDF generated');
     } catch (err) {
       toast.error((err as Error).message);
     } finally {
@@ -62,11 +75,16 @@ export default function App() {
     }
   }
 
+  function handleClosePanel() {
+    setSelectedEmployee(null);
+    setPdfUrl(null);
+  }
+
   async function handleSendEmail() {
-    if (!employee) return;
+    if (!selectedEmployee) return;
     setSending(true);
     try {
-      const res = await emailReport(employee.EmpID);
+      const res = await emailReport(selectedEmployee.EmpID);
       if (res.previewOnly) {
         toast.success(`Preview-only: would have emailed ${res.sentTo}`);
       } else {
@@ -84,7 +102,7 @@ export default function App() {
     <div className="min-h-screen bg-mesh relative">
       <div className="absolute inset-0 grid-overlay opacity-40 pointer-events-none" />
 
-      <div className="relative max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
         {/* Header */}
         <motion.header
           initial={{ opacity: 0, y: -8 }}
@@ -97,7 +115,7 @@ export default function App() {
             </div>
             <div>
               <h1 className="text-lg sm:text-xl font-bold text-slate-50">Employee Reports</h1>
-              <p className="text-xs text-slate-400 -mt-0.5">Search · Generate · Email</p>
+              <p className="text-xs text-slate-400 -mt-0.5">Browse · Select · Preview · Email</p>
             </div>
           </div>
           <div className="hidden sm:flex items-center gap-2">
@@ -107,60 +125,55 @@ export default function App() {
           </div>
         </motion.header>
 
-        {/* Hero / Search */}
-        <section className="mb-6 sm:mb-8">
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.05 }}
-          >
-            <h2 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-slate-50 leading-tight">
-              <span className="bg-gradient-to-r from-indigo-300 via-fuchsia-300 to-rose-300 bg-clip-text text-transparent">
-                Find any employee
-              </span>{' '}
-              in milliseconds.
-            </h2>
-            <p className="mt-2 text-slate-400 text-sm sm:text-base max-w-2xl">
-              Search by Employee ID, generate a polished PDF report, and email it to them — all in one flow.
-            </p>
-          </motion.div>
-
-          <div className="mt-5 sm:mt-7">
-            <SearchBar
-              value={query}
-              onChange={setQuery}
-              onSubmit={handleSearch}
-              loading={loading}
+        {/* Filter input */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 }}
+          className="mb-5"
+        >
+          <div className="relative max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+            <input
+              type="text"
+              value={filterQuery}
+              onChange={(e) => setFilterQuery(e.target.value)}
+              placeholder="Filter by name, ID, department…"
+              className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-slate-900/70 border border-slate-700/60 text-slate-200 placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/60 transition"
             />
           </div>
-        </section>
+        </motion.div>
 
-        {/* Body */}
-        <section className="space-y-6">
-          {!employee && !loading && <EmptyState />}
+        {/* Table + detail panel */}
+        <div className={`grid gap-5 ${selectedEmployee ? 'lg:grid-cols-[1fr_420px]' : 'grid-cols-1'}`}>
+          <EmployeeTable
+            employees={employees}
+            loading={tableLoading}
+            selectedId={selectedEmployee?.EmpID ?? null}
+            onSelect={handleRowSelect}
+            page={currentPage}
+            pages={totalPages}
+            total={totalRecords}
+            onPageChange={setCurrentPage}
+          />
 
-          {loading && <SkeletonCard />}
-
-          {employee && (
-            <>
-              <EmployeeCard employee={employee} />
-              <ActionBar
-                onGenerate={handleGenerate}
-                onSendEmail={handleSendEmail}
+          <AnimatePresence>
+            {selectedEmployee && (
+              <DetailPanel
+                key={selectedEmployee.EmpID}
+                employee={selectedEmployee}
+                pdfUrl={pdfUrl}
                 generating={generating}
                 sending={sending}
-                hasPdf={!!pdfUrl}
+                onSendEmail={handleSendEmail}
+                onClose={handleClosePanel}
+                fileName={`EmployeeReport-${selectedEmployee.EmpID}.pdf`}
               />
-              <PdfPreview
-                url={pdfUrl}
-                fileName={`EmployeeReport-${employee.EmpID}.pdf`}
-                onClose={() => { URL.revokeObjectURL(pdfUrl!); setPdfUrl(null); }}
-              />
-            </>
-          )}
-        </section>
+            )}
+          </AnimatePresence>
+        </div>
 
-        {/* Sent History */}
+        {/* Sent history */}
         <section className="mt-8">
           <EmailLog ref={emailLogRef} />
         </section>
@@ -173,6 +186,114 @@ export default function App() {
   );
 }
 
+interface DetailPanelProps {
+  employee: Employee;
+  pdfUrl: string | null;
+  generating: boolean;
+  sending: boolean;
+  onSendEmail: () => void;
+  onClose: () => void;
+  fileName: string;
+}
+
+function DetailPanel({
+  employee, pdfUrl, generating, sending, onSendEmail, onClose, fileName,
+}: DetailPanelProps) {
+  const initials =
+    ((employee.FirstName?.[0] ?? '') + (employee.LastName?.[0] ?? '')).toUpperCase() || 'EM';
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 20 }}
+      transition={{ duration: 0.25 }}
+      className="glass rounded-2xl shadow-glow overflow-hidden flex flex-col"
+    >
+      {/* Mini employee header */}
+      <div className="flex items-center justify-between px-4 py-3.5 border-b border-white/5">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-fuchsia-500 grid place-items-center text-white text-sm font-bold shrink-0">
+            {initials}
+          </div>
+          <div className="min-w-0">
+            <div className="text-sm font-semibold text-slate-100 truncate">{employee.FullName}</div>
+            <div className="text-xs text-slate-400 truncate">
+              {employee.Designation} · <span className="font-mono text-indigo-300">{employee.EmpID}</span>
+            </div>
+          </div>
+        </div>
+        <button
+          onClick={onClose}
+          className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors shrink-0 ml-2"
+          title="Close panel"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* PDF area */}
+      <div className="flex-1 bg-slate-950 min-h-0">
+        {generating ? (
+          <div className="h-[460px] flex items-center justify-center">
+            <div className="text-center">
+              <Loader2 className="w-8 h-8 animate-spin text-indigo-400 mx-auto mb-3" />
+              <p className="text-sm text-slate-400">Generating PDF…</p>
+            </div>
+          </div>
+        ) : pdfUrl ? (
+          <>
+            <div className="flex items-center justify-between px-3 py-2 border-b border-white/5 bg-slate-900/40">
+              <span className="text-xs text-slate-400 truncate mr-2">{fileName}</span>
+              <div className="flex gap-1.5 shrink-0">
+                <a
+                  href={pdfUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-lg bg-slate-800/70 hover:bg-slate-800 text-slate-300 transition-colors"
+                >
+                  <ExternalLink className="w-3 h-3" /> Open
+                </a>
+                <a
+                  href={pdfUrl}
+                  download={fileName}
+                  className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-200 transition-colors"
+                >
+                  <Download className="w-3 h-3" /> Download
+                </a>
+              </div>
+            </div>
+            <iframe
+              title="PDF preview"
+              src={pdfUrl}
+              className="w-full h-[460px] bg-slate-950"
+            />
+          </>
+        ) : (
+          <div className="h-[460px] flex items-center justify-center text-slate-600 text-sm">
+            PDF generation failed — click the row to retry
+          </div>
+        )}
+      </div>
+
+      {/* Send email */}
+      <div className="px-4 py-3.5 border-t border-white/5">
+        <button
+          onClick={onSendEmail}
+          disabled={sending || !pdfUrl || generating}
+          title={pdfUrl ? `Send PDF to ${employee.Email}` : 'Waiting for PDF…'}
+          className="w-full inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-tr from-indigo-500 to-fuchsia-500 text-white font-semibold shadow-glow hover:shadow-glow-lg transition disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
+          {employee.Email
+            ? `Send to ${employee.Email.split('@')[0]}@…`
+            : 'Send Email'}
+        </button>
+      </div>
+    </motion.div>
+  );
+}
+
 function Pill({
   icon: Icon, text,
 }: { icon: React.ComponentType<{ className?: string }>; text: string }) {
@@ -181,25 +302,5 @@ function Pill({
       <Icon className="w-3.5 h-3.5 text-indigo-300" />
       {text}
     </span>
-  );
-}
-
-function SkeletonCard() {
-  return (
-    <div className="glass rounded-2xl p-6 shadow-glow">
-      <div className="flex gap-5">
-        <div className="w-20 h-20 rounded-2xl shimmer" />
-        <div className="flex-1 space-y-3">
-          <div className="h-4 w-1/3 rounded shimmer" />
-          <div className="h-3 w-1/2 rounded shimmer" />
-          <div className="grid grid-cols-2 gap-3 mt-4">
-            <div className="h-3 rounded shimmer" />
-            <div className="h-3 rounded shimmer" />
-            <div className="h-3 rounded shimmer" />
-            <div className="h-3 rounded shimmer" />
-          </div>
-        </div>
-      </div>
-    </div>
   );
 }

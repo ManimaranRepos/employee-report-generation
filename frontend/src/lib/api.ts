@@ -78,3 +78,17 @@ export async function fetchEmailLog(): Promise<{ count: number; entries: EmailLo
   const res = await fetch(`${BASE}/email-log`);
   return asJson(res);
 }
+
+export interface PagedResult {
+  data: Employee[];
+  total: number;
+  page: number;
+  pages: number;
+}
+
+export async function fetchEmployeesPage(page: number, limit = 10, q = ''): Promise<PagedResult> {
+  const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+  if (q.trim()) params.set('q', q.trim());
+  const res = await fetch(`${BASE}?${params}`);
+  return asJson<PagedResult>(res);
+}

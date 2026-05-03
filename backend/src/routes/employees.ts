@@ -32,6 +32,16 @@ router.get('/search', (req, res) => {
   res.json({ count: results.length, results });
 });
 
+/** GET /api/employees?page=&limit=&q= — paginated employee list */
+router.get('/', (req, res) => {
+  const page = Math.max(1, Number(req.query.page ?? 1));
+  const limit = Math.min(Math.max(1, Number(req.query.limit ?? 10)), 50);
+  const q = String(req.query.q ?? '').trim().slice(0, 64);
+  const { data, total } = employeeStore.getPage(page, limit, q || undefined);
+  const pages = Math.ceil(total / limit) || 1;
+  res.json({ data, total, page, pages });
+});
+
 /** GET /api/employees/:empId — fetch one record */
 router.get('/:empId', (req, res) => {
   const parsed = empIdParam.safeParse(req.params);

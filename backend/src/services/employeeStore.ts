@@ -78,6 +78,23 @@ class EmployeeStore {
     }
     return out;
   }
+
+  /** Paginated listing with optional filter — returns a slice of all employees. */
+  getPage(page: number, limit: number, query?: string): { data: Employee[]; total: number } {
+    const q = query?.trim().toLowerCase() ?? '';
+    const source = q
+      ? this.all.filter(
+          (e) =>
+            e.EmpID.toLowerCase().includes(q) ||
+            (e.FullName?.toLowerCase() ?? '').includes(q) ||
+            (e.Email?.toLowerCase() ?? '').includes(q) ||
+            (e.Department?.toLowerCase() ?? '').includes(q),
+        )
+      : this.all;
+    const total = source.length;
+    const offset = (page - 1) * limit;
+    return { data: source.slice(offset, offset + limit), total };
+  }
 }
 
 export const employeeStore = new EmployeeStore();
