@@ -24,20 +24,42 @@ export function generateEmployeePdf(employee: Employee): Promise<Buffer> {
       doc.on('error', reject);
 
       // ── Brand bar ────────────────────────────────────────────────────────
-      doc.rect(0, 0, doc.page.width, 80).fill('#0f172a'); // slate-900
-      doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(22)
-        .text('Employee Report', 48, 28);
-      doc.font('Helvetica').fontSize(10).fillColor('#cbd5e1')
-        .text('Confidential — for internal HR use only', 48, 56);
+      // Background
+      doc.rect(0, 0, doc.page.width, 90).fill('#0f172a');
 
-      // Right-aligned generated date
+      // Left accent stripe in Movate brand mauve
+      doc.rect(0, 0, 5, 90).fill('#513346');
+
+      // MOVATE wordmark
+      doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(18)
+        .text('MOVATE', 24, 18);
+
+      // Tagline
+      doc.font('Helvetica').fontSize(8).fillColor('#94a3b8')
+        .text('Your Applied AI Partner', 24, 41);
+
+      // Healthcare division badge
+      doc.roundedRect(24, 56, 160, 18, 3).fill('#513346');
+      doc.font('Helvetica-Bold').fontSize(8).fillColor('#e2d4dc')
+        .text('HEALTH & INSURANCE DIVISION', 30, 61);
+
+      // "Employee Report" on the right side
+      doc.font('Helvetica-Bold').fontSize(16).fillColor('#ffffff')
+        .text('Employee Report', 0, 22, { width: doc.page.width - 24, align: 'right' });
+
+      // Generated date
       const generatedAt = new Date().toLocaleString();
-      doc.fontSize(10).fillColor('#cbd5e1')
-        .text(`Generated: ${generatedAt}`, 0, 32, { width: doc.page.width - 48, align: 'right' });
+      doc.font('Helvetica').fontSize(8.5).fillColor('#64748b')
+        .text(`Generated: ${generatedAt}`, 0, 46, { width: doc.page.width - 24, align: 'right' });
+
+      // Confidential label
+      doc.fontSize(8).fillColor('#94a3b8')
+        .text('Confidential — Internal HR Use Only', 0, 62, { width: doc.page.width - 24, align: 'right' });
+
       doc.fillColor('#000');
 
       // ── Hero card ────────────────────────────────────────────────────────
-      const heroTop = 110;
+      const heroTop = 120;
       doc.roundedRect(48, heroTop, doc.page.width - 96, 110, 10)
         .fillAndStroke('#f1f5f9', '#e2e8f0'); // slate-100 / slate-200
 
@@ -120,11 +142,12 @@ export function generateEmployeePdf(employee: Employee): Promise<Buffer> {
       const footerY = doc.page.height - 56;
       doc.moveTo(48, footerY).lineTo(doc.page.width - 48, footerY)
         .strokeColor('#e2e8f0').lineWidth(1).stroke();
-      doc.font('Helvetica').fontSize(9).fillColor('#94a3b8')
+      doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#513346')
+        .text('MOVATE TECHNOLOGY', 48, footerY + 6);
+      doc.font('Helvetica').fontSize(8.5).fillColor('#94a3b8')
         .text(
-          'This document was generated automatically by the Employee Report Generation System. ' +
-          'Distribute only via approved HR channels.',
-          48, footerY + 8, { width: doc.page.width - 96, align: 'center' },
+          'Health & Insurance Division  ·  Generated automatically  ·  Distribute only via approved HR channels.',
+          48, footerY + 19, { width: doc.page.width - 96, align: 'center' },
         );
 
       doc.end();

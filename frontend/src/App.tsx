@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Database, Activity, ShieldCheck, Search, Loader2, Mail, X, ExternalLink, Download, ClipboardList,
+  Database, Activity, ShieldCheck, Search, Loader2, Mail, X, ExternalLink, Download, ClipboardList, HeartPulse,
 } from 'lucide-react';
 import { EmployeeTable } from './components/EmployeeTable';
 import { SelectionReviewPanel } from './components/SelectionReviewPanel';
@@ -177,13 +177,23 @@ export default function App() {
           animate={{ opacity: 1, y: 0 }}
           className="flex items-center justify-between mb-8 sm:mb-10"
         >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-fuchsia-500 grid place-items-center shadow-glow">
-              <span className="font-extrabold text-white">E</span>
-            </div>
-            <div>
-              <h1 className="text-lg sm:text-xl font-bold text-slate-50">Employee Reports</h1>
-              <p className="text-xs text-slate-400 -mt-0.5">Browse · Preview · Select · Email</p>
+          <div className="flex items-center gap-4">
+            {/* Movate logo */}
+            <img
+              src="https://upload.wikimedia.org/wikipedia/commons/1/1f/Movate-web-logo-TM.svg"
+              alt="Movate Technology"
+              className="h-8 sm:h-9 w-auto object-contain"
+              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+            />
+            <div className="w-px h-8 bg-white/10" />
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-rose-500/20 grid place-items-center">
+                <HeartPulse className="w-4 h-4 text-rose-400" />
+              </div>
+              <div>
+                <h1 className="text-base sm:text-lg font-bold text-slate-50 leading-tight">Employee Reports</h1>
+                <p className="text-[11px] text-slate-400 -mt-0.5">Health &amp; Insurance Division</p>
+              </div>
             </div>
           </div>
           <div className="hidden sm:flex items-center gap-2">
@@ -288,8 +298,12 @@ export default function App() {
           <EmailLog ref={emailLogRef} />
         </section>
 
-        <footer className="mt-14 text-center text-xs text-slate-500">
-          Built with React · Vite · Tailwind · Framer Motion · Express · PDFKit · Nodemailer
+        <footer className="mt-14 text-center text-xs text-slate-500 space-y-1">
+          <div className="flex items-center justify-center gap-1.5">
+            <HeartPulse className="w-3.5 h-3.5 text-rose-500/60" />
+            <span>Movate Technology · Health &amp; Insurance Division</span>
+          </div>
+          <div>Built with React · Vite · Tailwind · Framer Motion · Express · PDFKit · Nodemailer</div>
         </footer>
       </div>
     </div>
