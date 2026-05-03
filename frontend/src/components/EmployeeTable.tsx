@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Users } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Users, FileText } from 'lucide-react';
 import type { Employee } from '../lib/api';
 
 interface Props {
@@ -103,6 +103,7 @@ export function EmployeeTable({
               <th className="px-4 py-3 text-left text-[11px] uppercase tracking-wide text-slate-500 font-medium hidden lg:table-cell">Designation</th>
               <th className="px-4 py-3 text-left text-[11px] uppercase tracking-wide text-slate-500 font-medium">Status</th>
               <th className="px-4 py-3 text-right text-[11px] uppercase tracking-wide text-slate-500 font-medium hidden sm:table-cell">Salary</th>
+              <th className="px-4 py-3 w-16 text-center text-[11px] uppercase tracking-wide text-slate-500 font-medium">Report</th>
             </tr>
           </thead>
           <tbody>
@@ -116,11 +117,12 @@ export function EmployeeTable({
                   <td className="px-4 py-3.5 hidden lg:table-cell"><div className="h-3 w-28 rounded shimmer" /></td>
                   <td className="px-4 py-3.5"><div className="h-3 w-12 rounded shimmer" /></td>
                   <td className="px-4 py-3.5 hidden sm:table-cell"><div className="h-3 w-16 rounded shimmer ml-auto" /></td>
+                  <td className="px-4 py-3.5"><div className="h-5 w-7 rounded shimmer mx-auto" /></td>
                 </tr>
               ))
             ) : employees.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-14 text-center">
+                <td colSpan={8} className="px-4 py-14 text-center">
                   <Users className="w-8 h-8 mx-auto mb-2.5 text-slate-600" />
                   <p className="text-slate-500 text-sm">No employees found</p>
                 </td>
@@ -140,9 +142,10 @@ export function EmployeeTable({
                         ? 'bg-fuchsia-500/10'
                         : selected
                         ? 'bg-indigo-500/15'
-                        : 'hover:bg-slate-800/40'
+                        : 'hover:bg-slate-800/30'
                     }`}
                   >
+                    {/* Checkbox */}
                     <td
                       className="px-4 py-3 w-10"
                       onClick={(e) => { e.stopPropagation(); onToggleCheck(emp); }}
@@ -155,34 +158,15 @@ export function EmployeeTable({
                         className="w-3.5 h-3.5 rounded border-slate-600 bg-slate-800 accent-indigo-500 cursor-pointer"
                       />
                     </td>
-                    <td
-                      onClick={() => onSelect(emp)}
-                      className={`px-4 py-3 font-medium text-slate-100 cursor-pointer ${selected ? 'shadow-[inset_3px_0_0_rgb(99,102,241)]' : ''}`}
-                    >
+
+                    {/* Data cells — no click handler, read-only */}
+                    <td className={`px-4 py-3 font-medium text-slate-100 ${selected ? 'shadow-[inset_3px_0_0_rgb(99,102,241)]' : ''}`}>
                       {emp.FullName}
                     </td>
-                    <td
-                      onClick={() => onSelect(emp)}
-                      className="px-4 py-3 font-mono text-xs text-indigo-300 cursor-pointer"
-                    >
-                      {emp.EmpID}
-                    </td>
-                    <td
-                      onClick={() => onSelect(emp)}
-                      className="px-4 py-3 text-slate-300 hidden md:table-cell cursor-pointer"
-                    >
-                      {emp.Department}
-                    </td>
-                    <td
-                      onClick={() => onSelect(emp)}
-                      className="px-4 py-3 text-slate-400 hidden lg:table-cell cursor-pointer"
-                    >
-                      {emp.Designation}
-                    </td>
-                    <td
-                      onClick={() => onSelect(emp)}
-                      className="px-4 py-3 cursor-pointer"
-                    >
+                    <td className="px-4 py-3 font-mono text-xs text-indigo-300">{emp.EmpID}</td>
+                    <td className="px-4 py-3 text-slate-300 hidden md:table-cell">{emp.Department}</td>
+                    <td className="px-4 py-3 text-slate-400 hidden lg:table-cell">{emp.Designation}</td>
+                    <td className="px-4 py-3">
                       <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold ${
                         emp.Status === 'Active'
                           ? 'bg-emerald-500/20 text-emerald-300'
@@ -191,13 +175,25 @@ export function EmployeeTable({
                         {emp.Status}
                       </span>
                     </td>
-                    <td
-                      onClick={() => onSelect(emp)}
-                      className="px-4 py-3 text-right text-slate-300 font-medium hidden sm:table-cell cursor-pointer"
-                    >
+                    <td className="px-4 py-3 text-right text-slate-300 font-medium hidden sm:table-cell">
                       {emp.AnnualSalary.toLocaleString('en-US', {
                         style: 'currency', currency: 'USD', maximumFractionDigits: 0,
                       })}
+                    </td>
+
+                    {/* PDF preview action */}
+                    <td className="px-3 py-3 text-center">
+                      <button
+                        onClick={() => onSelect(emp)}
+                        title={`Preview PDF report for ${emp.FullName}`}
+                        className={`inline-flex items-center justify-center w-8 h-8 rounded-lg transition-colors ${
+                          selected
+                            ? 'bg-indigo-500/30 text-indigo-300'
+                            : 'hover:bg-indigo-500/20 text-slate-500 hover:text-indigo-300'
+                        }`}
+                      >
+                        <FileText className="w-4 h-4" />
+                      </button>
                     </td>
                   </motion.tr>
                 );
