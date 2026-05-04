@@ -185,14 +185,14 @@ export default function App() {
               className="h-8 sm:h-9 w-auto object-contain"
               onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
             />
-            <div className="w-px h-8 bg-white/10" />
+            <div className="w-px h-8 bg-slate-300" />
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-lg bg-rose-500/20 grid place-items-center">
                 <HeartPulse className="w-4 h-4 text-rose-400" />
               </div>
               <div>
-                <h1 className="text-base sm:text-lg font-bold text-slate-50 leading-tight">Employee Reports</h1>
-                <p className="text-[11px] text-slate-400 -mt-0.5">Health &amp; Insurance Division</p>
+                <h1 className="text-base sm:text-lg font-bold text-slate-900 leading-tight">Employee Reports</h1>
+                <p className="text-[11px] text-slate-500 -mt-0.5">Health &amp; Insurance Division</p>
               </div>
             </div>
           </div>
@@ -217,7 +217,7 @@ export default function App() {
               value={filterQuery}
               onChange={(e) => setFilterQuery(e.target.value)}
               placeholder="Filter by name, ID, department…"
-              className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-slate-900/70 border border-slate-700/60 text-slate-200 placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/60 transition"
+              className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-white border border-slate-300 text-slate-800 placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/60 transition"
             />
           </div>
 
@@ -231,12 +231,12 @@ export default function App() {
                 transition={{ duration: 0.15 }}
                 className="flex items-center gap-2"
               >
-                <span className="text-xs text-slate-400">
-                  <span className="font-semibold text-indigo-300">{checkedIds.size}</span> selected
+                <span className="text-xs text-slate-600">
+                  <span className="font-semibold text-indigo-600">{checkedIds.size}</span> selected
                 </span>
                 <button
                   onClick={() => setCheckedEmployees(new Map())}
-                  className="text-xs text-slate-500 hover:text-slate-300 transition-colors underline underline-offset-2"
+                  className="text-xs text-slate-500 hover:text-slate-700 transition-colors underline underline-offset-2"
                 >
                   Clear
                 </button>
@@ -331,28 +331,28 @@ function DetailPanel({ employee, pdfUrl, generating, sending, onSendEmail, onClo
       transition={{ duration: 0.25 }}
       className="glass rounded-2xl shadow-glow overflow-hidden flex flex-col"
     >
-      <div className="flex items-center justify-between px-4 py-3.5 border-b border-white/5">
+      <div className="flex items-center justify-between px-4 py-3.5 border-b border-slate-200">
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-fuchsia-500 grid place-items-center text-white text-sm font-bold shrink-0">
             {initials}
           </div>
           <div className="min-w-0">
-            <div className="text-sm font-semibold text-slate-100 truncate">{employee.FullName}</div>
-            <div className="text-xs text-slate-400 truncate">
-              {employee.Designation} · <span className="font-mono text-indigo-300">{employee.EmpID}</span>
+            <div className="text-sm font-semibold text-slate-900 truncate">{employee.FullName}</div>
+            <div className="text-xs text-slate-600 truncate">
+              {employee.Designation} · <span className="font-mono text-indigo-600">{employee.EmpID}</span>
             </div>
           </div>
         </div>
         <button
           onClick={onClose}
-          className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors shrink-0 ml-2"
+          className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors shrink-0 ml-2"
           title="Close panel"
         >
           <X className="w-4 h-4" />
         </button>
       </div>
 
-      <div className="flex-1 bg-slate-950 min-h-0">
+      <div className="flex-1 bg-slate-50 min-h-0">
         {generating ? (
           <div className="h-[460px] flex items-center justify-center">
             <div className="text-center">
@@ -362,36 +362,36 @@ function DetailPanel({ employee, pdfUrl, generating, sending, onSendEmail, onClo
           </div>
         ) : pdfUrl ? (
           <>
-            <div className="flex items-center justify-between px-3 py-2 border-b border-white/5 bg-slate-900/40">
-              <span className="text-xs text-slate-400 truncate mr-2">{fileName}</span>
+            <div className="flex items-center justify-between px-3 py-2 border-b border-slate-200 bg-slate-50">
+              <span className="text-xs text-slate-600 truncate mr-2">{fileName}</span>
               <div className="flex gap-1.5 shrink-0">
                 <a
                   href={pdfUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-lg bg-slate-800/70 hover:bg-slate-800 text-slate-300 transition-colors"
+                  className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors"
                 >
                   <ExternalLink className="w-3 h-3" /> Open
                 </a>
                 <a
                   href={pdfUrl}
                   download={fileName}
-                  className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-200 transition-colors"
+                  className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition-colors"
                 >
                   <Download className="w-3 h-3" /> Download
                 </a>
               </div>
             </div>
-            <iframe title="PDF preview" src={pdfUrl} className="w-full h-[460px] bg-slate-950" />
+            <iframe title="PDF preview" src={pdfUrl} className="w-full h-[460px] bg-slate-50" />
           </>
         ) : (
-          <div className="h-[460px] flex items-center justify-center text-slate-600 text-sm">
+          <div className="h-[460px] flex items-center justify-center text-slate-400 text-sm">
             PDF generation failed — click the row to retry
           </div>
         )}
       </div>
 
-      <div className="px-4 py-3.5 border-t border-white/5">
+      <div className="px-4 py-3.5 border-t border-slate-200">
         <button
           onClick={onSendEmail}
           disabled={sending || !pdfUrl || generating}
@@ -408,7 +408,7 @@ function DetailPanel({ employee, pdfUrl, generating, sending, onSendEmail, onClo
 
 function Pill({ icon: Icon, text }: { icon: React.ComponentType<{ className?: string }>; text: string }) {
   return (
-    <span className="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full bg-slate-900/60 border border-white/5 text-slate-300">
+    <span className="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full bg-white border border-slate-200 text-slate-600">
       <Icon className="w-3.5 h-3.5 text-indigo-300" />
       {text}
     </span>

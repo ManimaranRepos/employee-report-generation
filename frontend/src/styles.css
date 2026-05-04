@@ -3,44 +3,45 @@
 @tailwind utilities;
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 html, body, #root { height: 100%; }
 body {
   font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
-  background: #050816;
-  color: #e2e8f0;
+  background: #ffffff;
+  color: #1e293b;
 }
 
-/* Animated mesh gradient background */
+/* Subtle light mesh gradient background */
 .bg-mesh {
   background:
-    radial-gradient(at 20% 20%, rgba(99,102,241,0.35) 0px, transparent 45%),
-    radial-gradient(at 80% 0%,  rgba(168,85,247,0.30) 0px, transparent 50%),
-    radial-gradient(at 80% 80%, rgba(14,165,233,0.30) 0px, transparent 45%),
-    radial-gradient(at 10% 90%, rgba(236,72,153,0.25) 0px, transparent 45%),
-    #050816;
+    radial-gradient(at 20% 20%, rgba(99,102,241,0.08) 0px, transparent 45%),
+    radial-gradient(at 80% 0%,  rgba(168,85,247,0.06) 0px, transparent 50%),
+    radial-gradient(at 80% 80%, rgba(14,165,233,0.06) 0px, transparent 45%),
+    radial-gradient(at 10% 90%, rgba(236,72,153,0.05) 0px, transparent 45%),
+    #ffffff;
 }
 
-/* Frosted glass card */
+/* Light glass card */
 .glass {
-  background: rgba(15, 23, 42, 0.55);
+  background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(18px) saturate(140%);
   -webkit-backdrop-filter: blur(18px) saturate(140%);
-  border: 1px solid rgba(148, 163, 184, 0.12);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.04);
 }
 
 /* Subtle grid overlay */
 .grid-overlay {
   background-image:
-    linear-gradient(rgba(148,163,184,0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(148,163,184,0.06) 1px, transparent 1px);
+    linear-gradient(rgba(100,116,139,0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(100,116,139,0.07) 1px, transparent 1px);
   background-size: 36px 36px;
 }
 
 .shimmer {
-  background: linear-gradient(90deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.10) 50%, rgba(255,255,255,0.04) 100%);
+  background: linear-gradient(90deg, rgba(0,0,0,0.04) 0%, rgba(0,0,0,0.09) 50%, rgba(0,0,0,0.04) 100%);
   background-size: 200% 100%;
   animation: shimmer 1.4s infinite;
 }
